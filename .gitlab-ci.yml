@@ -8,6 +8,19 @@
 stages:
 - test
 - secret-detection
+- code-test
+- build
+
+##########################
+# Rules - Main
+##########################
+
+.auto_file_watch_trigger: &file_watch_trigger
+  - if: '$CI_PIPELINE_SOURCE == "push"'
+    changes:
+      - Dockerfile
+      - "src/main/java/com/tcyao/nid/**/*"
+
 sast:
   stage: test
 include:
@@ -17,3 +30,21 @@ variables:
   SECRET_DETECTION_ENABLED: 'true'
 secret_detection:
   stage: secret-detection
+
+spring-test:
+  stage: code-test
+  rules:
+    - *file_watch_trigger
+  script:
+    - mvn test
+
+image-build:
+  stage: build
+  rules:
+    - *file_watch_trigger
+  variables:
+    IMAGE_NAME: "$CI_REGISTRY_IMAGE:latest"
+  script:
+    - |
+      docker build -t "$IMAGE_NAME" .
+      docker push "$IMAGE_NAME"
