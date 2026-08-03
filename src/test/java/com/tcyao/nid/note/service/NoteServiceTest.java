@@ -19,7 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.NoSuchElementException;
+import com.tcyao.nid.note.exception.NoteNotFoundException;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -133,7 +133,7 @@ class NoteServiceTest {
     void getNote_whenNotFound_shouldThrow() {
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(NoSuchElementException.class, () -> noteService.getNote(99L));
+        assertThrows(NoteNotFoundException.class, () -> noteService.getNote(99L));
     }
 
     @Test
@@ -253,7 +253,7 @@ class NoteServiceTest {
 
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(NoSuchElementException.class, () -> noteService.updateNote(99L, request));
+        assertThrows(NoteNotFoundException.class, () -> noteService.updateNote(99L, request));
     }
 
     @Test
@@ -274,6 +274,6 @@ class NoteServiceTest {
     void deleteNote_whenNotFound_shouldThrow() {
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(NoSuchElementException.class, () -> noteService.deleteNote(99L));
+        assertThrows(NoteNotFoundException.class, () -> noteService.deleteNote(99L));
     }
 }

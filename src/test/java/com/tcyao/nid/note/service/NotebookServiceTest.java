@@ -13,7 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.NoSuchElementException;
+import com.tcyao.nid.note.exception.NotebookNotFoundException;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -91,7 +91,7 @@ class NotebookServiceTest {
     void getNotebook_whenNotFound_shouldThrow() {
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(NoSuchElementException.class, () -> notebookService.getNotebook(99L));
+        assertThrows(NotebookNotFoundException.class, () -> notebookService.getNotebook(99L));
     }
 
     @Test
@@ -162,7 +162,7 @@ class NotebookServiceTest {
 
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(NoSuchElementException.class, () -> notebookService.updateNotebook(99L, request));
+        assertThrows(NotebookNotFoundException.class, () -> notebookService.updateNotebook(99L, request));
     }
 
     @Test
@@ -184,6 +184,6 @@ class NotebookServiceTest {
     void deleteNotebook_whenNotFound_shouldThrow() {
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(NoSuchElementException.class, () -> notebookService.deleteNotebook(99L));
+        assertThrows(NotebookNotFoundException.class, () -> notebookService.deleteNotebook(99L));
     }
 }
