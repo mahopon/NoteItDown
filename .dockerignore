@@ -1,0 +1,12 @@
+**/.git
+**/.gitattributes
+**/.gitignore
+**/.gitlab-ci.yml
+**/.env
+**/.idea
+**/.mvn
+**/target
+**/*.md
+**/mvnw
+**/mvnw.cmd
+**/HELP.md
