@@ -2,6 +2,7 @@ package com.tcyao.nid.note.service;
 
 import com.tcyao.nid.note.dto.*;
 import com.tcyao.nid.note.entity.Notebook;
+import com.tcyao.nid.note.entity.Tag;
 import com.tcyao.nid.note.repository.NotebookRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,8 @@ public class NotebookService {
     public GetNotebookResponse getNotebook(Long id) {
         Notebook notebook = repository.findById(id).orElseThrow();
         List<GetNoteResponse> notes = notebook.getNotes().stream()
-                .map(n -> new GetNoteResponse(n.getId(), n.getTitle(), n.getText()))
+                .map(n -> new GetNoteResponse(n.getId(), n.getTitle(), n.getText(),
+                        notebook.getId(), n.getTags().stream().map(Tag::getId).toList()))
                 .toList();
         return new GetNotebookResponse(notebook.getId(), notebook.getTitle(), notes, notebook.getCreatedAt(), notebook.getModifiedAt());
     }
@@ -35,7 +37,8 @@ public class NotebookService {
         return repository.findAll().stream()
                 .map(nb -> {
                     List<GetNoteResponse> notes = nb.getNotes().stream()
-                            .map(n -> new GetNoteResponse(n.getId(), n.getTitle(), n.getText()))
+                            .map(n -> new GetNoteResponse(n.getId(), n.getTitle(), n.getText(),
+                                    nb.getId(), n.getTags().stream().map(Tag::getId).toList()))
                             .toList();
                     return new GetNotebookResponse(nb.getId(), nb.getTitle(), notes, nb.getCreatedAt(), nb.getModifiedAt());
                 })

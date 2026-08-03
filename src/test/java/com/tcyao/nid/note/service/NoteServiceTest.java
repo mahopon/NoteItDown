@@ -5,7 +5,11 @@ import com.tcyao.nid.note.dto.CreateNoteResponse;
 import com.tcyao.nid.note.dto.GetNoteResponse;
 import com.tcyao.nid.note.dto.UpdateNoteRequest;
 import com.tcyao.nid.note.entity.Note;
+import com.tcyao.nid.note.entity.Notebook;
+import com.tcyao.nid.note.entity.Tag;
 import com.tcyao.nid.note.repository.NoteRepository;
+import com.tcyao.nid.note.repository.NotebookRepository;
+import com.tcyao.nid.note.repository.TagRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -26,12 +30,21 @@ class NoteServiceTest {
     @Mock
     private NoteRepository repository;
 
+    @Mock
+    private NotebookRepository notebookRepository;
+
+    @Mock
+    private TagRepository tagRepository;
+
     @InjectMocks
     private NoteService noteService;
 
     @Test
     void createNote_shouldSaveAndReturnResponse() {
-        CreateNoteRequest request = new CreateNoteRequest("Test Title", "Test Text");
+        Tag tagA = new Tag("tagA");
+        tagA.setId(1L);
+
+        CreateNoteRequest request = new CreateNoteRequest("Test Title", "Test Text", null, List.of(1L));
 
         Note savedNote = new Note();
         savedNote.setId(1L);
@@ -43,6 +56,7 @@ class NoteServiceTest {
             note.setId(1L);
             return savedNote;
         });
+        when(tagRepository.findById(1L)).thenReturn(Optional.of(tagA));
 
         CreateNoteResponse response = noteService.createNote(request);
 
@@ -52,18 +66,56 @@ class NoteServiceTest {
 
         assertEquals("Test Title", captured.getTitle());
         assertEquals("Test Text", captured.getText());
+        assertEquals(1, captured.getTags().size());
+        assertTrue(captured.getTags().stream().anyMatch(t -> t.getName().equals("tagA")));
 
         assertEquals(1L, response.id());
         assertEquals("Test Title", response.title());
         assertEquals("Test Text", response.text());
+        assertNull(response.notebookId());
+        assertEquals(List.of(1L), response.tags());
+    }
+
+    @Test
+    void createNote_withNotebook_shouldAssignNotebook() {
+        Notebook notebook = new Notebook();
+        notebook.setId(5L);
+
+        CreateNoteRequest request = new CreateNoteRequest("Title", "Text", 5L, null);
+
+        Note savedNote = new Note();
+        savedNote.setId(1L);
+        savedNote.setTitle("Title");
+        savedNote.setText("Text");
+        savedNote.setNotebook(notebook);
+
+        when(notebookRepository.findById(5L)).thenReturn(Optional.of(notebook));
+        when(repository.save(any(Note.class))).thenAnswer(invocation -> {
+            Note note = invocation.getArgument(0);
+            note.setId(1L);
+            return savedNote;
+        });
+
+        CreateNoteResponse response = noteService.createNote(request);
+
+        assertEquals(5L, response.notebookId());
+        assertTrue(response.tags().isEmpty());
     }
 
     @Test
     void getNote_whenExists_shouldReturnResponse() {
+        Notebook notebook = new Notebook();
+        notebook.setId(2L);
+
+        Tag tag = new Tag("urgent");
+        tag.setId(1L);
+
         Note note = new Note();
         note.setId(1L);
         note.setTitle("Title");
         note.setText("Text");
+        note.setNotebook(notebook);
+        note.getTags().add(tag);
 
         when(repository.findById(1L)).thenReturn(Optional.of(note));
 
@@ -72,6 +124,8 @@ class NoteServiceTest {
         assertEquals(1L, response.id());
         assertEquals("Title", response.title());
         assertEquals("Text", response.text());
+        assertEquals(2L, response.notebookId());
+        assertEquals(List.of(1L), response.tags());
     }
 
     @Test
@@ -101,9 +155,13 @@ class NoteServiceTest {
         assertEquals(1L, responses.get(0).id());
         assertEquals("A", responses.get(0).title());
         assertEquals("a", responses.get(0).text());
+        assertNull(responses.get(0).notebookId());
+        assertTrue(responses.get(0).tags().isEmpty());
         assertEquals(2L, responses.get(1).id());
         assertEquals("B", responses.get(1).title());
         assertEquals("b", responses.get(1).text());
+        assertNull(responses.get(1).notebookId());
+        assertTrue(responses.get(1).tags().isEmpty());
     }
 
     @Test
@@ -122,20 +180,75 @@ class NoteServiceTest {
         existingNote.setTitle("Old Title");
         existingNote.setText("Old Text");
 
-        UpdateNoteRequest request = new UpdateNoteRequest("New Title", "New Text");
+        Tag tagA = new Tag("tagA");
+        tagA.setId(1L);
+        existingNote.getTags().add(tagA);
+
+        Tag tagC = new Tag("tagC");
+        tagC.setId(2L);
+
+        UpdateNoteRequest request = new UpdateNoteRequest("New Title", "New Text", null, List.of(1L, 2L));
 
         when(repository.findById(1L)).thenReturn(Optional.of(existingNote));
+        when(tagRepository.findById(1L)).thenReturn(Optional.of(tagA));
+        when(tagRepository.findById(2L)).thenReturn(Optional.of(tagC));
 
         noteService.updateNote(1L, request);
 
         assertEquals("New Title", existingNote.getTitle());
         assertEquals("New Text", existingNote.getText());
+        assertNull(existingNote.getNotebook());
+        assertEquals(2, existingNote.getTags().size());
+        assertTrue(existingNote.getTags().stream().anyMatch(t -> t.getId().equals(1L)));
+        assertTrue(existingNote.getTags().stream().anyMatch(t -> t.getId().equals(2L)));
         verify(repository).findById(1L);
     }
 
-@Test
+    @Test
+    void updateNote_whenTagsMatch_shouldNotModifyTags() {
+        Note existingNote = new Note();
+        existingNote.setId(1L);
+        existingNote.setTitle("Title");
+        existingNote.setText("Text");
+
+        Tag tagA = new Tag("tagA");
+        tagA.setId(1L);
+        existingNote.getTags().add(tagA);
+
+        UpdateNoteRequest request = new UpdateNoteRequest("Title", "Text", null, List.of(1L));
+
+        when(repository.findById(1L)).thenReturn(Optional.of(existingNote));
+
+        noteService.updateNote(1L, request);
+
+        assertEquals(1, existingNote.getTags().size());
+        verify(tagRepository, never()).findById(anyLong());
+    }
+
+    @Test
+    void updateNote_withNotebook_shouldAssignNotebook() {
+        Note existingNote = new Note();
+        existingNote.setId(1L);
+        existingNote.setTitle("Title");
+        existingNote.setText("Text");
+
+        Notebook notebook = new Notebook();
+        notebook.setId(10L);
+
+        UpdateNoteRequest request = new UpdateNoteRequest("Title", "Text", 10L, null);
+
+        when(repository.findById(1L)).thenReturn(Optional.of(existingNote));
+        when(notebookRepository.findById(10L)).thenReturn(Optional.of(notebook));
+
+        noteService.updateNote(1L, request);
+
+        assertNotNull(existingNote.getNotebook());
+        assertEquals(10L, existingNote.getNotebook().getId());
+    }
+
+    @Test
     void updateNote_whenNotFound_shouldThrow() {
-        UpdateNoteRequest request = new UpdateNoteRequest("Title", "Text");
+        UpdateNoteRequest request = new UpdateNoteRequest("Title", "Text", null, null);
 
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
