@@ -1,4 +1,4 @@
-package com.tcyao.nid.common.config;
+package com.tcyao.nid.common.middleware;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
