@@ -7,5 +7,5 @@ public record GetNoteResponse(
         String title,
         String text,
         Long notebookId,
-        List<Long> tags
+        List<TagResponse> tags
 ) {}

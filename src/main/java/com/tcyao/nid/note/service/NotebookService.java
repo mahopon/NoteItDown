@@ -2,7 +2,6 @@ package com.tcyao.nid.note.service;
 
 import com.tcyao.nid.note.dto.*;
 import com.tcyao.nid.note.entity.Notebook;
-import com.tcyao.nid.note.entity.Tag;
 import com.tcyao.nid.note.exception.NotebookNotFoundException;
 import com.tcyao.nid.note.repository.NotebookRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +27,7 @@ public class NotebookService {
         Notebook notebook = repository.findById(id).orElseThrow(() -> new NotebookNotFoundException(id));
         List<GetNoteResponse> notes = notebook.getNotes().stream()
                 .map(n -> new GetNoteResponse(n.getId(), n.getTitle(), n.getText(),
-                        notebook.getId(), n.getTags().stream().map(Tag::getId).toList()))
+                        notebook.getId(), n.getTags().stream().map(t -> new TagResponse(t.getId(), t.getName())).toList()))
                 .toList();
         return new GetNotebookResponse(notebook.getId(), notebook.getTitle(), notes, notebook.getCreatedAt(), notebook.getModifiedAt());
     }
@@ -39,7 +38,7 @@ public class NotebookService {
                 .map(nb -> {
                     List<GetNoteResponse> notes = nb.getNotes().stream()
                             .map(n -> new GetNoteResponse(n.getId(), n.getTitle(), n.getText(),
-                                    nb.getId(), n.getTags().stream().map(Tag::getId).toList()))
+                                    nb.getId(), n.getTags().stream().map(t -> new TagResponse(t.getId(), t.getName())).toList()))
                             .toList();
                     return new GetNotebookResponse(nb.getId(), nb.getTitle(), notes, nb.getCreatedAt(), nb.getModifiedAt());
                 })

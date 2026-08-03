@@ -3,6 +3,7 @@ package com.tcyao.nid.note.service;
 import com.tcyao.nid.note.dto.CreateNoteRequest;
 import com.tcyao.nid.note.dto.CreateNoteResponse;
 import com.tcyao.nid.note.dto.GetNoteResponse;
+import com.tcyao.nid.note.dto.TagResponse;
 import com.tcyao.nid.note.dto.UpdateNoteRequest;
 import com.tcyao.nid.note.entity.Note;
 import com.tcyao.nid.note.entity.Notebook;
@@ -49,7 +50,7 @@ public class NoteService {
                 newNote.getTitle(),
                 newNote.getText(),
                 newNote.getNotebook() != null ? newNote.getNotebook().getId() : null,
-                newNote.getTags().stream().map(Tag::getId).toList()
+                newNote.getTags().stream().map(t -> new TagResponse(t.getId(), t.getName())).toList()
         );
     }
 
@@ -61,7 +62,7 @@ public class NoteService {
                 foundNote.getTitle(),
                 foundNote.getText(),
                 foundNote.getNotebook() != null ? foundNote.getNotebook().getId() : null,
-                foundNote.getTags().stream().map(Tag::getId).toList()
+                foundNote.getTags().stream().map(t -> new TagResponse(t.getId(), t.getName())).toList()
         );
     }
 
@@ -73,7 +74,7 @@ public class NoteService {
                         note.getTitle(),
                         note.getText(),
                         note.getNotebook() != null ? note.getNotebook().getId() : null,
-                        note.getTags().stream().map(Tag::getId).toList()))
+                        note.getTags().stream().map(t -> new TagResponse(t.getId(), t.getName())).toList()))
                 .toList();
     }
 

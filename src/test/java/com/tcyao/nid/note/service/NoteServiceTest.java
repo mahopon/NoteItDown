@@ -3,6 +3,7 @@ package com.tcyao.nid.note.service;
 import com.tcyao.nid.note.dto.CreateNoteRequest;
 import com.tcyao.nid.note.dto.CreateNoteResponse;
 import com.tcyao.nid.note.dto.GetNoteResponse;
+import com.tcyao.nid.note.dto.TagResponse;
 import com.tcyao.nid.note.dto.UpdateNoteRequest;
 import com.tcyao.nid.note.entity.Note;
 import com.tcyao.nid.note.entity.Notebook;
@@ -73,7 +74,7 @@ class NoteServiceTest {
         assertEquals("Test Title", response.title());
         assertEquals("Test Text", response.text());
         assertNull(response.notebookId());
-        assertEquals(List.of(1L), response.tags());
+        assertEquals(List.of(new TagResponse(1L, "tagA")), response.tags());
     }
 
     @Test
@@ -125,7 +126,7 @@ class NoteServiceTest {
         assertEquals("Title", response.title());
         assertEquals("Text", response.text());
         assertEquals(2L, response.notebookId());
-        assertEquals(List.of(1L), response.tags());
+        assertEquals(List.of(new TagResponse(1L, "urgent")), response.tags());
     }
 
     @Test
