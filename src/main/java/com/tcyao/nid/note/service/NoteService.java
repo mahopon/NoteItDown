@@ -7,6 +7,8 @@ import com.tcyao.nid.note.dto.UpdateNoteRequest;
 import com.tcyao.nid.note.entity.Note;
 import com.tcyao.nid.note.entity.Notebook;
 import com.tcyao.nid.note.entity.Tag;
+import com.tcyao.nid.note.exception.NoteNotFoundException;
+import com.tcyao.nid.note.exception.NotebookNotFoundException;
 import com.tcyao.nid.note.repository.NoteRepository;
 import com.tcyao.nid.note.repository.NotebookRepository;
 import com.tcyao.nid.note.repository.TagRepository;
@@ -29,13 +31,13 @@ public class NoteService {
         newNote.setText(request.text());
 
         if (request.notebookId() != null) {
-            Notebook notebook = notebookRepository.findById(request.notebookId()).orElseThrow();
+            Notebook notebook = notebookRepository.findById(request.notebookId()).orElseThrow(() -> new NotebookNotFoundException(request.notebookId()));
             newNote.setNotebook(notebook);
         }
 
         if (request.tags() != null) {
             request.tags().forEach(tagId -> {
-                Tag tag = tagRepository.findById(tagId).orElseThrow();
+                Tag tag = tagRepository.findById(tagId).orElseThrow(() -> new RuntimeException("Tag not found with id: " + tagId));
                 newNote.getTags().add(tag);
             });
         }
@@ -53,7 +55,7 @@ public class NoteService {
 
     @Transactional(readOnly = true)
     public GetNoteResponse getNote(Long id) {
-        Note foundNote = repository.findById(id).orElseThrow();
+        Note foundNote = repository.findById(id).orElseThrow(() -> new NoteNotFoundException(id));
         return new GetNoteResponse(
                 foundNote.getId(),
                 foundNote.getTitle(),
@@ -77,14 +79,14 @@ public class NoteService {
 
     @Transactional
     public void updateNote(Long id, UpdateNoteRequest request) {
-        Note note = repository.findById(id).orElseThrow();
+        Note note = repository.findById(id).orElseThrow(() -> new NoteNotFoundException(id));
         if (note.getTitle() == null || !note.getTitle().equals(request.title()))
             note.setTitle(request.title());
         if (note.getText() == null || !note.getText().equals(request.text()))
             note.setText(request.text());
 
         if (request.notebookId() != null) {
-            Notebook notebook = notebookRepository.findById(request.notebookId()).orElseThrow();
+            Notebook notebook = notebookRepository.findById(request.notebookId()).orElseThrow(() -> new NotebookNotFoundException(request.notebookId()));
             note.setNotebook(notebook);
         }
 
@@ -93,7 +95,7 @@ public class NoteService {
             if (!currentTagIds.equals(request.tags())) {
                 note.getTags().clear();
 request.tags().forEach(tagId -> {
-Tag tag = tagRepository.findById(tagId).orElseThrow();
+Tag tag = tagRepository.findById(tagId).orElseThrow(() -> new RuntimeException("Tag not found with id: " + tagId));
                     note.getTags().add(tag);
                 });
             }
@@ -102,7 +104,7 @@ Tag tag = tagRepository.findById(tagId).orElseThrow();
 
     @Transactional
     public void deleteNote(Long id) {
-        Note note = repository.findById(id).orElseThrow();
+        Note note = repository.findById(id).orElseThrow(() -> new NoteNotFoundException(id));
         repository.delete(note);
     }
 }

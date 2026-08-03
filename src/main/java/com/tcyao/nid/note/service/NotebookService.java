@@ -3,6 +3,7 @@ package com.tcyao.nid.note.service;
 import com.tcyao.nid.note.dto.*;
 import com.tcyao.nid.note.entity.Notebook;
 import com.tcyao.nid.note.entity.Tag;
+import com.tcyao.nid.note.exception.NotebookNotFoundException;
 import com.tcyao.nid.note.repository.NotebookRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,7 +25,7 @@ public class NotebookService {
 
     @Transactional(readOnly = true)
     public GetNotebookResponse getNotebook(Long id) {
-        Notebook notebook = repository.findById(id).orElseThrow();
+        Notebook notebook = repository.findById(id).orElseThrow(() -> new NotebookNotFoundException(id));
         List<GetNoteResponse> notes = notebook.getNotes().stream()
                 .map(n -> new GetNoteResponse(n.getId(), n.getTitle(), n.getText(),
                         notebook.getId(), n.getTags().stream().map(Tag::getId).toList()))
@@ -47,14 +48,14 @@ public class NotebookService {
 
     @Transactional
     public void updateNotebook(Long id, UpdateNotebookRequest request) {
-        Notebook notebook = repository.findById(id).orElseThrow();
+        Notebook notebook = repository.findById(id).orElseThrow(() -> new NotebookNotFoundException(id));
         notebook.setTitle(request.title());
         notebook.setModifiedAt(java.time.Instant.now());
     }
 
     @Transactional
     public void deleteNotebook(Long id) {
-        Notebook notebook = repository.findById(id).orElseThrow();
+        Notebook notebook = repository.findById(id).orElseThrow(() -> new NotebookNotFoundException(id));
         repository.delete(notebook);
     }
 }
