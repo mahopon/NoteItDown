@@ -15,11 +15,14 @@ stages:
 # Rules - Main
 ##########################
 
+.web_manual_trigger: &web_trigger
+  if: $CI_PIPELINE_SOURCE == "web"
+
 .auto_file_watch_trigger: &file_watch_trigger
-  - if: '$CI_PIPELINE_SOURCE == "push"'
-    changes:
-      - Dockerfile
-      - "src/main/java/com/tcyao/nid/**/*"
+  if: $CI_PIPELINE_SOURCE == "push"
+  changes:
+    - Dockerfile
+    - "src/main/java/com/tcyao/nid/**/*"
 
 sast:
   stage: test
@@ -34,6 +37,7 @@ secret_detection:
 spring-test:
   stage: code-test
   rules:
+    - *web_trigger
     - *file_watch_trigger
   script:
     - mvn test
@@ -41,6 +45,7 @@ spring-test:
 image-build:
   stage: build
   rules:
+    - *web_trigger
     - *file_watch_trigger
   variables:
     IMAGE_NAME: "$CI_REGISTRY_IMAGE:latest"
