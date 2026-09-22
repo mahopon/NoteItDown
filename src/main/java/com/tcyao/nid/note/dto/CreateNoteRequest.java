@@ -1,12 +1,13 @@
 package com.tcyao.nid.note.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
-import java.util.List;
+//import java.util.List;
 
 public record CreateNoteRequest(
     @NotBlank String title,
     String text,
-    Long notebookId,
-    List<Long> tags
+    @NotNull Long notebookId
+//    List<Long> tags
 ) {}

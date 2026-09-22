@@ -2,11 +2,11 @@ package com.tcyao.nid.note.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-import java.util.List;
+//import java.util.List;
 
 public record UpdateNoteRequest(
         @NotBlank String title,
         String text,
-        Long notebookId,
-        List<Long> tags
+        Long notebookId
+//        List<Long> tags
 ) {}

@@ -60,7 +60,7 @@ public class UserController {
     @GetMapping("")
     public ResponseEntity<GetUserResponse> getUser(Authentication authentication) {
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-        GetUserResponse res = userService.getUser(new GetUserRequest(UUID.fromString(principal.getUsername())));
+        GetUserResponse res = userService.getUser(new GetUserRequest((principal.getId())));
         return ResponseEntity.ok(res);
     }
 

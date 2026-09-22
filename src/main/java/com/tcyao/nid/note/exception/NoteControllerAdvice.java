@@ -19,6 +19,13 @@ public class NoteControllerAdvice {
         return detail;
     }
 
+    @ExceptionHandler(NotebookNotFoundException.class)
+    public ProblemDetail handleNotebookNotFound(NotebookNotFoundException e) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+        detail.setTitle("Notebook Not Found");
+        return detail;
+    }
+
     @ExceptionHandler(NoSuchElementException.class)
     public ProblemDetail handleNoSuchElement(NoSuchElementException e) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());

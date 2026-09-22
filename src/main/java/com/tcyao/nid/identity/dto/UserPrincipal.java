@@ -40,4 +40,8 @@ public class UserPrincipal implements UserDetails {
     public String getUsername() {
         return this.email;
     }
+
+    public UUID getId() {
+        return this.id;
+    }
 }

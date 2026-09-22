@@ -15,10 +15,28 @@ spring:
         format_sql: true
   session:
     store-type: jdbc
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+#        default-requeue-rejected: false
+        concurrency: 2
+        max-concurrency: 10
+        retry:
+          enabled: true
+          initial-interval: 1000
+          multiplier: 2
+          max-interval: 10000
+          max-attempts: 5
+
 
 logging:
   level:
     org.springframework.security: DEBUG
+    org.springframework.rabbit: DEBUG
 #  data:
 #    redis:
 #      host: ${REDIS_HOST}

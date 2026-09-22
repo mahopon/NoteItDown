@@ -1,11 +1,11 @@
 package com.tcyao.nid.note.dto;
 
-import java.util.List;
+//import java.util.List;
 
 public record CreateNoteResponse(
         Long id,
         String title,
         String text,
-        Long notebookId,
-        List<TagResponse> tags
+        Long notebookId
+//        List<TagResponse> tags
 ) {}

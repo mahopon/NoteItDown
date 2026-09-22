@@ -7,8 +7,11 @@ import com.tcyao.nid.identity.dto.GetUserResponse;
 import com.tcyao.nid.identity.entity.Role;
 import com.tcyao.nid.identity.entity.User;
 import com.tcyao.nid.identity.exception.UserEmailExistsException;
+import com.tcyao.nid.identity.messaging.event.UserRegisteredEvent;
+import com.tcyao.nid.identity.messaging.handler.UserRegisteredHandler;
 import com.tcyao.nid.identity.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +24,8 @@ import java.util.Optional;
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder encoder;
+    private final ApplicationEventPublisher eventPublisher;
+    private final UserRegisteredHandler registeredHandler;
 
     @Transactional
     public CreateUserResponse createNewUser(CreateUserRequest user) {
@@ -33,6 +38,7 @@ public class UserService {
         newUser.setHashedPassword(encoder.encode(user.password()));
         newUser.setRole(Role.USER);
         userRepository.save(newUser);
+        eventPublisher.publishEvent(new UserRegisteredEvent(newUser.getId()));
         return new CreateUserResponse(newUser.getId(), newUser.getEmail());
     }
 

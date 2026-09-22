@@ -1,8 +1,12 @@
 package com.tcyao.nid.note.service;
 
+import com.tcyao.nid.identity.entity.User;
+import com.tcyao.nid.identity.repository.UserRepository;
 import com.tcyao.nid.note.dto.*;
 import com.tcyao.nid.note.entity.Note;
 import com.tcyao.nid.note.entity.Notebook;
+import com.tcyao.nid.note.enums.CreatableNotebookKind;
+import com.tcyao.nid.note.enums.NotebookKind;
 import com.tcyao.nid.note.repository.NotebookRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,8 +17,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
-import com.tcyao.nid.note.exception.NotebookNotFoundException;
+import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.UUID;
+import com.tcyao.nid.note.exception.NotebookNotFoundException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,12 +31,21 @@ class NotebookServiceTest {
     @Mock
     private NotebookRepository repository;
 
+    @Mock
+    private UserRepository userRepository;
+
     @InjectMocks
     private NotebookService notebookService;
 
     @Test
     void createNotebook_shouldSaveAndReturnResponse() {
-        CreateNotebookRequest request = new CreateNotebookRequest("My Notebook");
+        UUID ownerId = UUID.randomUUID();
+        CreateNotebookRequest request = new CreateNotebookRequest("My Notebook", CreatableNotebookKind.PERSONAL.toNotebookKind());
+
+        User owner = new User();
+        owner.setId(ownerId);
+
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
 
         Notebook savedNotebook = new Notebook();
         savedNotebook.setId(1L);
@@ -46,13 +61,15 @@ class NotebookServiceTest {
             return savedNotebook;
         });
 
-        CreateNotebookResponse response = notebookService.createNotebook(request);
+        CreateNotebookResponse response = notebookService.createNotebook(request, ownerId);
 
         ArgumentCaptor<Notebook> captor = ArgumentCaptor.forClass(Notebook.class);
         verify(repository).save(captor.capture());
         Notebook captured = captor.getValue();
 
         assertEquals("My Notebook", captured.getTitle());
+        assertEquals(NotebookKind.PERSONAL, captured.getKind());
+        assertEquals(owner, captured.getOwner());
         assertEquals(1L, response.id());
         assertEquals("My Notebook", response.title());
         assertEquals(Instant.parse("2026-01-01T00:00:00Z"), response.createdAt());
@@ -60,7 +77,20 @@ class NotebookServiceTest {
     }
 
     @Test
+    void createNotebook_whenOwnerNotFound_shouldThrow() {
+        UUID ownerId = UUID.randomUUID();
+        CreateNotebookRequest request = new CreateNotebookRequest("My Notebook", CreatableNotebookKind.SHARED.toNotebookKind());
+
+        when(userRepository.findById(ownerId)).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class, () -> notebookService.createNotebook(request, ownerId));
+        verify(repository, never()).save(any(Notebook.class));
+    }
+
+    @Test
     void getNotebook_whenExists_shouldReturnResponse() {
+        UUID ownerId = UUID.randomUUID();
+
         Notebook notebook = new Notebook();
         notebook.setId(1L);
         notebook.setTitle("My Notebook");
@@ -73,9 +103,9 @@ class NotebookServiceTest {
         note.setText("Note Text");
         notebook.getNotes().add(note);
 
-        when(repository.findById(1L)).thenReturn(Optional.of(notebook));
+        when(repository.findByIdAndOwner_Id(1L, ownerId)).thenReturn(Optional.of(notebook));
 
-        GetNotebookResponse response = notebookService.getNotebook(1L);
+        GetNotebookResponse response = notebookService.getNotebook(1L, ownerId);
 
         assertEquals(1L, response.id());
         assertEquals("My Notebook", response.title());
@@ -89,13 +119,17 @@ class NotebookServiceTest {
 
     @Test
     void getNotebook_whenNotFound_shouldThrow() {
-        when(repository.findById(99L)).thenReturn(Optional.empty());
+        UUID ownerId = UUID.randomUUID();
 
-        assertThrows(NotebookNotFoundException.class, () -> notebookService.getNotebook(99L));
+        when(repository.findByIdAndOwner_Id(99L, ownerId)).thenReturn(Optional.empty());
+
+        assertThrows(NotebookNotFoundException.class, () -> notebookService.getNotebook(99L, ownerId));
     }
 
     @Test
     void getAllNotebooks_whenNotebooksExist_shouldReturnList() {
+        UUID ownerId = UUID.randomUUID();
+
         Notebook nb1 = new Notebook();
         nb1.setId(1L);
         nb1.setTitle("First");
@@ -114,9 +148,9 @@ class NotebookServiceTest {
         note1.setText("a");
         nb1.getNotes().add(note1);
 
-        when(repository.findAll()).thenReturn(List.of(nb1, nb2));
+        when(repository.findByOwner_Id(ownerId)).thenReturn(List.of(nb1, nb2));
 
-        List<GetNotebookResponse> responses = notebookService.getAllNotebooks();
+        List<GetNotebookResponse> responses = notebookService.getAllNotebooks(ownerId);
 
         assertEquals(2, responses.size());
         assertEquals(1L, responses.get(0).id());
@@ -130,15 +164,19 @@ class NotebookServiceTest {
 
     @Test
     void getAllNotebooks_whenNoNotebooks_shouldReturnEmptyList() {
-        when(repository.findAll()).thenReturn(List.of());
+        UUID ownerId = UUID.randomUUID();
 
-        List<GetNotebookResponse> responses = notebookService.getAllNotebooks();
+        when(repository.findByOwner_Id(ownerId)).thenReturn(List.of());
+
+        List<GetNotebookResponse> responses = notebookService.getAllNotebooks(ownerId);
 
         assertTrue(responses.isEmpty());
     }
 
     @Test
     void updateNotebook_whenExists_shouldUpdateTitleAndModifiedAt() {
+        UUID ownerId = UUID.randomUUID();
+
         Notebook existingNotebook = new Notebook();
         existingNotebook.setId(1L);
         existingNotebook.setTitle("Old Title");
@@ -147,43 +185,48 @@ class NotebookServiceTest {
 
         UpdateNotebookRequest request = new UpdateNotebookRequest("New Title");
 
-        when(repository.findById(1L)).thenReturn(Optional.of(existingNotebook));
+        when(repository.findByIdAndOwner_Id(1L, ownerId)).thenReturn(Optional.of(existingNotebook));
 
-        notebookService.updateNotebook(1L, request);
+        notebookService.updateNotebook(1L, ownerId, request);
 
         assertEquals("New Title", existingNotebook.getTitle());
         assertTrue(existingNotebook.getModifiedAt().isAfter(Instant.parse("2026-01-01T00:00:00Z")));
-        verify(repository).findById(1L);
+        verify(repository).findByIdAndOwner_Id(1L, ownerId);
     }
 
     @Test
     void updateNotebook_whenNotFound_shouldThrow() {
+        UUID ownerId = UUID.randomUUID();
         UpdateNotebookRequest request = new UpdateNotebookRequest("Title");
 
-        when(repository.findById(99L)).thenReturn(Optional.empty());
+        when(repository.findByIdAndOwner_Id(99L, ownerId)).thenReturn(Optional.empty());
 
-        assertThrows(NotebookNotFoundException.class, () -> notebookService.updateNotebook(99L, request));
+        assertThrows(NotebookNotFoundException.class, () -> notebookService.updateNotebook(99L, ownerId, request));
     }
 
     @Test
     void deleteNotebook_whenExists_shouldDelete() {
+        UUID ownerId = UUID.randomUUID();
+
         Notebook notebook = new Notebook();
         notebook.setId(1L);
         notebook.setTitle("Title");
         notebook.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
         notebook.setModifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
 
-        when(repository.findById(1L)).thenReturn(Optional.of(notebook));
+        when(repository.findByIdAndOwner_Id(1L, ownerId)).thenReturn(Optional.of(notebook));
 
-        notebookService.deleteNotebook(1L);
+        notebookService.deleteNotebook(1L, ownerId);
 
         verify(repository).delete(notebook);
     }
 
     @Test
     void deleteNotebook_whenNotFound_shouldThrow() {
-        when(repository.findById(99L)).thenReturn(Optional.empty());
+        UUID ownerId = UUID.randomUUID();
 
-        assertThrows(NotebookNotFoundException.class, () -> notebookService.deleteNotebook(99L));
+        when(repository.findByIdAndOwner_Id(99L, ownerId)).thenReturn(Optional.empty());
+
+        assertThrows(NotebookNotFoundException.class, () -> notebookService.deleteNotebook(99L, ownerId));
     }
 }
