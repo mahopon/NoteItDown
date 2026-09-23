@@ -1,0 +1,12 @@
+route: # Decides where to send (to receiver) based matching rules on metadata
+  receiver: webhook
+
+  routes:
+    - match:
+        severity: warning
+
+
+receivers: # Configures how to send
+  - name: webhook
+    webhook_configs:
+      - url: "http://some-service:8080/alerts"
