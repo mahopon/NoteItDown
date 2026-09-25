@@ -7,7 +7,14 @@ RUN --mount=type=cache,target=/root/.m2/repository mvn package -DskipTests -B
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN wget -O "otel.java" https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+
+RUN useradd --create-home --shell /usr/sbin/nologin app \
+    && wget --progress=dot:giga -O otel.java https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+
 COPY --from=builder /build/target/*.jar app.jar
+RUN chown app:app app.jar otel.java
+
+USER app
+
 EXPOSE 8080
 ENTRYPOINT ["java", "-javaagent:./otel.java", "-jar", "app.jar"]
