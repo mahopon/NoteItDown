@@ -31,7 +31,22 @@ spring:
           multiplier: 2
           max-interval: 10000
           max-attempts: 5
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
 
+nid:
+  mail:
+    transport: ${NID_MAIL_TRANSPORT:smtp}
+    from: ${NID_MAIL_FROM:noreply@nid.local}
+    ses:
+      region: ${AWS_REGION:ap-southeast-1}
 
 logging:
   level:

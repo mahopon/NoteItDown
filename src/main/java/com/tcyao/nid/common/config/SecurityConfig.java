@@ -29,7 +29,7 @@ public class SecurityConfig {
                 .addFilterBefore(trailingSlashNormalizationFilter, SecurityContextHolderFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/user/register", "/user/login").permitAll()
-                        .requestMatchers("/public","/status", "/error", "/csrf", "/swagger-ui/**", "/v3/**").permitAll()
+                        .requestMatchers("/public","/status/**", "/error", "/csrf", "/swagger-ui/**", "/v3/**").permitAll()
                         .anyRequest().authenticated()
                 )
 //                .formLogin(form -> form.loginPage("/user/login").permitAll()) // Only usable if from a form (url-encoded)
