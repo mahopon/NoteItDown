@@ -1,5 +1,6 @@
 package com.tcyao.nid.identity.exception;
 
+import com.tcyao.nid.identity.controller.UserController;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -8,7 +9,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.NoSuchElementException;
 
-@RestControllerAdvice
+@RestControllerAdvice(assignableTypes = UserController.class)
 public class UserControllerAdvice {
 
 
