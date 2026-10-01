@@ -29,7 +29,9 @@ public class SecurityConfig {
                 .addFilterBefore(trailingSlashNormalizationFilter, SecurityContextHolderFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/user/register", "/user/login").permitAll()
-                        .requestMatchers("/public","/status/**", "/error", "/csrf", "/swagger-ui/**", "/v3/**").permitAll()
+                        .requestMatchers("/public","/status/**", "/error", "/csrf", "/swagger-ui/**", "/v3/**", "/api/**").permitAll()
+                        // Actuator lives on a separate management port (see management.server.port),
+                        // so it is not served by this chain and is protected at the network layer.
                         .anyRequest().authenticated()
                 )
 //                .formLogin(form -> form.loginPage("/user/login").permitAll()) // Only usable if from a form (url-encoded)
