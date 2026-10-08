@@ -9,14 +9,24 @@
 include:
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/Container-Scanning.gitlab-ci.yml
 
+# The `test` stage is required by the GitLab security templates, which default
+# to it. Jobs we don't relocate explicitly (e.g. dependency scanning analyzers)
+# fall back to `test`.
 stages:
 - screen
 - code-test
 - build
+- scan
+- test
 
 variables:
   SECRET_DETECTION_ENABLED: 'true'
+  # Container scanning fails the job on HIGH or CRITICAL findings.
+  # Raise to "CRITICAL" if the base image produces too much noise.
+  CS_SEVERITY_THRESHOLD: "High"
 
 ##########################
 # Rules - Main
@@ -31,11 +41,39 @@ variables:
     - Dockerfile
     - "src/main/java/com/tcyao/nid/**/*"
 
+##########################
+# Security - static analysis (pre-build)
+##########################
+
 sast:
   stage: screen
+  variables:
+    SAST_EXCLUDED_PATHS: "spec, test, tests, tmp, target"
+
+# Java-native SAST: SpotBugs with the FindSecBugs rule set (Spring/Java security rules
+spotbugs:
+  stage: screen
+  image: maven:3.9-eclipse-temurin-21
+  allow_failure: true
+  rules:
+    - *web_trigger
+    - *file_watch_trigger
+  script:
+    - mvn -B -DskipTests compile spotbugs:check
+  artifacts:
+    when: always
+    paths:
+      - target/spotbugsXml.xml
 
 secret_detection:
   stage: screen
+
+.ds-analyzer:
+  stage: screen
+
+##########################
+# Test & Build
+##########################
 
 spring-test:
   stage: code-test
@@ -64,3 +102,20 @@ image-build:
       --context "${CI_PROJECT_DIR}"
       --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
       --destination "$IMAGE_NAME"
+
+##########################
+# Security - container image (post-build)
+##########################
+
+container_scanning:
+  stage: scan
+  needs: ["image-build"]
+  rules:
+    - if: $CONTAINER_SCANNING_DISABLED == 'true' || $CONTAINER_SCANNING_DISABLED == '1'
+      when: never
+    - *web_trigger
+    - *file_watch_trigger
+  variables:
+    CS_IMAGE: "$CI_REGISTRY_IMAGE/nid-be:latest"
+    CS_REGISTRY_USER: "$CI_REGISTRY_USER"
+    CS_REGISTRY_PASSWORD: "$CI_REGISTRY_PASSWORD"

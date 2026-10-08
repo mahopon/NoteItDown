@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!--
+      EI_EXPOSE_REP (returning a mutable internal reference) and EI_EXPOSE_REP2
+      (storing an external mutable reference) are false positives for this codebase:
+
+      - Spring beans receive their collaborators via constructor injection. Those
+        collaborators are framework-managed singletons, not externally owned mutable state.
+      - JPA entities expose managed associations (getters) and are instantiated/mutated by
+        Hibernate via field access; copying or wrapping those references would break persistence.
+
+      Scoped to com.tcyao.nid so third-party code and the FindSecBugs plugin are unaffected.
+    -->
+    <Match>
+        <Class name="~com\.tcyao\.nid\..*"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>
