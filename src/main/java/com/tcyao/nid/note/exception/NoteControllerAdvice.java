@@ -1,6 +1,7 @@
 package com.tcyao.nid.note.exception;
 
 import com.tcyao.nid.note.controller.NoteController;
+import com.tcyao.nid.storage.exception.UnsupportedArtifactContentTypeException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -23,6 +24,20 @@ public class NoteControllerAdvice {
     public ProblemDetail handleNotebookNotFound(NotebookNotFoundException e) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
         detail.setTitle("Notebook Not Found");
+        return detail;
+    }
+
+    @ExceptionHandler(AttachmentNotFoundException.class)
+    public ProblemDetail handleAttachmentNotFound(AttachmentNotFoundException e) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+        detail.setTitle("Attachment Not Found");
+        return detail;
+    }
+
+    @ExceptionHandler(UnsupportedArtifactContentTypeException.class)
+    public ProblemDetail handleUnsupportedContentType(UnsupportedArtifactContentTypeException e) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.UNSUPPORTED_MEDIA_TYPE, e.getMessage());
+        detail.setTitle("Unsupported Media Type");
         return detail;
     }
 

@@ -1,4 +1,4 @@
-package com.tcyao.nid.note.exception;
+package com.tcyao.nid.storage.exception;
 
 public class UnsupportedArtifactContentTypeException extends RuntimeException {
     public UnsupportedArtifactContentTypeException(String contentType) {

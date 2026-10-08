@@ -194,6 +194,23 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>com.github.spotbugs</groupId>
+				<artifactId>spotbugs-maven-plugin</artifactId>
+				<version>4.9.3.0</version>
+				<configuration>
+					<effort>Max</effort>
+					<threshold>Medium</threshold>
+					<excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+				</configuration>
+				<dependencies>
+					<dependency>
+						<groupId>com.h3xstream.findsecbugs</groupId>
+						<artifactId>findsecbugs-plugin</artifactId>
+						<version>1.14.0</version>
+					</dependency>
+				</dependencies>
+			</plugin>
 
 		</plugins>
 		<finalName>app</finalName>

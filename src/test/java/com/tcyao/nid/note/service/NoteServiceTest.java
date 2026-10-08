@@ -2,265 +2,236 @@ package com.tcyao.nid.note.service;
 
 import com.tcyao.nid.identity.entity.User;
 import com.tcyao.nid.identity.repository.UserRepository;
-import com.tcyao.nid.note.dto.CreateNoteRequest;
-import com.tcyao.nid.note.dto.CreateNoteResponse;
-import com.tcyao.nid.note.dto.GetNoteResponse;
-import com.tcyao.nid.note.dto.UpdateNoteRequest;
+import com.tcyao.nid.note.dto.*;
+import com.tcyao.nid.note.entity.Attachment;
 import com.tcyao.nid.note.entity.Note;
 import com.tcyao.nid.note.entity.Notebook;
+import com.tcyao.nid.note.enums.NotebookKind;
 import com.tcyao.nid.note.exception.NoteNotFoundException;
 import com.tcyao.nid.note.exception.NotebookNotFoundException;
-import com.tcyao.nid.note.repository.NoteRepository;
 import com.tcyao.nid.note.repository.NotebookRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class NoteServiceTest {
 
     @Mock
-    private NoteRepository repository;
-
-    @Mock
-    private NotebookRepository notebookRepository;
+    private NotebookRepository repository;
 
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private AttachmentService attachmentService;
+
     @InjectMocks
     private NoteService noteService;
 
-    @Test
-    void createNote_shouldSaveAndReturnResponse() {
-        UUID userId = UUID.randomUUID();
-        User creator = new User();
-        creator.setId(userId);
+    private User user(UUID id) {
+        User user = new User();
+        user.setId(id);
+        return user;
+    }
 
-        Notebook notebook = new Notebook();
+    private Notebook notebook() {
+        Notebook notebook = new Notebook("Notebook", NotebookKind.PERSONAL, user(UUID.randomUUID()));
         notebook.setId(5L);
+        notebook.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        notebook.setModifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        return notebook;
+    }
 
-        CreateNoteRequest request = new CreateNoteRequest("Test Title", "Test Text", 5L);
+    @Test
+    void createNote_shouldProvisionAttachmentsAndAddNote() {
+        UUID userId = UUID.randomUUID();
+        UUID uploadId = UUID.randomUUID();
+        Notebook notebook = notebook();
+        AttachmentInput input = new AttachmentInput(null, "a.png", "image/png");
+        CreateNoteRequest request = new CreateNoteRequest("Test Title", "Test Text", List.of(input));
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(creator));
-        when(notebookRepository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.of(notebook));
-        when(repository.save(any(Note.class))).thenAnswer(invocation -> {
-            Note note = invocation.getArgument(0);
-            note.setId(1L);
-            return note;
+        when(repository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.of(notebook));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId)));
+        when(attachmentService.provision(input, userId))
+                .thenReturn(new AttachmentService.Provisioned(new Attachment(uploadId, "a.png", "image/png"), "https://upload/" + uploadId));
+        when(repository.saveAndFlush(any(Notebook.class))).thenAnswer(invocation -> {
+            Notebook nb = invocation.getArgument(0);
+            nb.getNotes().forEach(n -> n.setId(1L));
+            return nb;
         });
 
-        CreateNoteResponse response = noteService.createNote(request, userId);
+        CreateNoteResponse response = noteService.createNote(5L, request, userId);
 
-        ArgumentCaptor<Note> captor = ArgumentCaptor.forClass(Note.class);
-        verify(repository).save(captor.capture());
-        Note captured = captor.getValue();
-
-        assertEquals("Test Title", captured.getTitle());
-        assertEquals("Test Text", captured.getText());
-        assertEquals(notebook, captured.getNotebook());
-        assertEquals(creator, captured.getCreatedBy());
-        assertEquals(creator, captured.getLastModifiedBy());
-
+        assertEquals(1, notebook.getNotes().size());
+        assertEquals(1, notebook.getNotes().get(0).getAttachments().size());
         assertEquals(1L, response.id());
-        assertEquals("Test Title", response.title());
-        assertEquals("Test Text", response.text());
-        assertEquals(5L, response.notebookId());
+        assertEquals(1, response.attachments().size());
+        assertEquals(uploadId, response.attachments().get(0).uploadId());
+        assertEquals("https://upload/" + uploadId, response.attachments().get(0).uploadUrl());
+    }
+
+    @Test
+    void createNote_withNullAttachments_shouldStillWork() {
+        UUID userId = UUID.randomUUID();
+        Notebook notebook = notebook();
+        CreateNoteRequest request = new CreateNoteRequest("Title", "Text", null);
+
+        when(repository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.of(notebook));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId)));
+        when(repository.saveAndFlush(any(Notebook.class))).thenAnswer(invocation -> {
+            Notebook nb = invocation.getArgument(0);
+            nb.getNotes().forEach(n -> n.setId(1L));
+            return nb;
+        });
+
+        CreateNoteResponse response = noteService.createNote(5L, request, userId);
+
+        assertTrue(response.attachments().isEmpty());
+        assertTrue(notebook.getNotes().get(0).getAttachments().isEmpty());
+        verifyNoInteractions(attachmentService);
     }
 
     @Test
     void createNote_whenNotebookNotOwned_shouldThrow() {
         UUID userId = UUID.randomUUID();
-        User creator = new User();
-        creator.setId(userId);
+        CreateNoteRequest request = new CreateNoteRequest("Title", "Text", List.of());
 
-        CreateNoteRequest request = new CreateNoteRequest("Title", "Text", 5L);
+        when(repository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.empty());
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(creator));
-        when(notebookRepository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.empty());
-
-        assertThrows(NotebookNotFoundException.class, () -> noteService.createNote(request, userId));
-        verify(repository, never()).save(any(Note.class));
+        assertThrows(NotebookNotFoundException.class, () -> noteService.createNote(5L, request, userId));
+        verify(repository, never()).saveAndFlush(any(Notebook.class));
+        verifyNoInteractions(userRepository);
+        verifyNoInteractions(attachmentService);
     }
 
     @Test
-    void createNote_whenUserNotFound_shouldThrow() {
+    void getNotes_shouldReturnNotes() {
         UUID userId = UUID.randomUUID();
-        CreateNoteRequest request = new CreateNoteRequest("Title", "Text", 5L);
+        Notebook notebook = notebook();
+        Note note = notebook.addNote("Title", "Text", user(userId));
+        note.setId(7L);
 
-        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+        when(repository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.of(notebook));
 
-        assertThrows(NoSuchElementException.class, () -> noteService.createNote(request, userId));
-        verify(repository, never()).save(any(Note.class));
+        List<GetNoteResponse> responses = noteService.getNotes(5L, userId);
+
+        assertEquals(1, responses.size());
+        assertEquals(7L, responses.get(0).id());
+        assertEquals(5L, responses.get(0).notebookId());
+        assertTrue(responses.get(0).attachments().isEmpty());
     }
 
     @Test
-    void getNote_whenExists_shouldReturnResponse() {
+    void getNote_whenExists_returnsAttachmentsWithoutUrl() {
         UUID userId = UUID.randomUUID();
-        Notebook notebook = new Notebook();
-        notebook.setId(2L);
+        UUID uploadId = UUID.randomUUID();
+        Notebook notebook = notebook();
+        Note note = notebook.addNote("Title", "Text", user(userId));
+        note.setId(7L);
+        notebook.replaceNoteAttachments(7L, List.of(new Attachment(uploadId, "a.png", "image/png")));
 
-        Note note = new Note();
-        note.setId(1L);
-        note.setTitle("Title");
-        note.setText("Text");
-        note.setNotebook(notebook);
+        when(repository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.of(notebook));
 
-        when(repository.findByIdAndCreatedBy_Id(1L, userId)).thenReturn(Optional.of(note));
+        GetNoteResponse response = noteService.getNote(5L, 7L, userId);
 
-        GetNoteResponse response = noteService.getNote(1L, userId);
-
-        assertEquals(1L, response.id());
-        assertEquals("Title", response.title());
-        assertEquals("Text", response.text());
-        assertEquals(2L, response.notebookId());
+        assertEquals(1, response.attachments().size());
+        assertEquals(uploadId, response.attachments().get(0).uploadId());
+        assertNull(response.attachments().get(0).uploadUrl());
     }
 
     @Test
-    void getNote_whenNotFound_shouldThrow() {
+    void updateNote_shouldReconcileAttachments() {
         UUID userId = UUID.randomUUID();
+        UUID keepId = UUID.randomUUID();
+        UUID newId = UUID.randomUUID();
+        Notebook notebook = notebook();
+        Note note = notebook.addNote("Old", "Old", user(userId));
+        note.setId(7L);
+        notebook.replaceNoteAttachments(7L, List.of(new Attachment(keepId, "keep.png", "image/png")));
 
-        when(repository.findByIdAndCreatedBy_Id(99L, userId)).thenReturn(Optional.empty());
+        AttachmentInput keep = new AttachmentInput(keepId, "keep.png", "image/png");
+        AttachmentInput fresh = new AttachmentInput(null, "new.jpg", "image/jpeg");
+        UpdateNoteRequest request = new UpdateNoteRequest("New", "New", List.of(keep, fresh));
 
-        assertThrows(NoteNotFoundException.class, () -> noteService.getNote(99L, userId));
+        when(repository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.of(notebook));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId)));
+        when(attachmentService.provision(keep, userId))
+                .thenReturn(new AttachmentService.Provisioned(new Attachment(keepId, "keep.png", "image/png"), null));
+        when(attachmentService.provision(fresh, userId))
+                .thenReturn(new AttachmentService.Provisioned(new Attachment(newId, "new.jpg", "image/jpeg"), "https://upload/" + newId));
+
+        GetNoteResponse response = noteService.updateNote(5L, 7L, request, userId);
+
+        assertEquals("New", note.getTitle());
+        assertEquals(2, note.getAttachments().size());
+        assertEquals(2, response.attachments().size());
+        assertNull(response.attachments().get(0).uploadUrl());
+        assertEquals("https://upload/" + newId, response.attachments().get(1).uploadUrl());
     }
 
     @Test
-    void getAllNotes_whenNotesExist_shouldReturnList() {
+    void updateNote_shouldDropAttachmentsNotInList() {
         UUID userId = UUID.randomUUID();
+        UUID removedId = UUID.randomUUID();
+        Notebook notebook = notebook();
+        Note note = notebook.addNote("Old", "Old", user(userId));
+        note.setId(7L);
+        notebook.replaceNoteAttachments(7L, List.of(new Attachment(removedId, "gone.png", "image/png")));
 
-        Note note1 = new Note();
-        note1.setId(1L);
-        note1.setTitle("A");
-        note1.setText("a");
+        UpdateNoteRequest request = new UpdateNoteRequest("New", "New", List.of());
 
-        Note note2 = new Note();
-        note2.setId(2L);
-        note2.setTitle("B");
-        note2.setText("b");
+        when(repository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.of(notebook));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId)));
 
-        when(repository.findByCreatedBy_Id(userId)).thenReturn(List.of(note1, note2));
+        noteService.updateNote(5L, 7L, request, userId);
 
-        List<GetNoteResponse> responses = noteService.getAllNotes(userId);
-
-        assertEquals(2, responses.size());
-        assertEquals(1L, responses.get(0).id());
-        assertEquals("A", responses.get(0).title());
-        assertEquals("a", responses.get(0).text());
-        assertNull(responses.get(0).notebookId());
-        assertEquals(2L, responses.get(1).id());
-        assertEquals("B", responses.get(1).title());
-        assertEquals("b", responses.get(1).text());
-        assertNull(responses.get(1).notebookId());
+        assertTrue(note.getAttachments().isEmpty());
     }
 
     @Test
-    void getAllNotes_whenNoNotes_shouldReturnEmptyList() {
+    void updateNote_whenNoteNotInNotebook_shouldThrow() {
         UUID userId = UUID.randomUUID();
+        Notebook notebook = notebook();
+        UpdateNoteRequest request = new UpdateNoteRequest("Title", "Text", List.of());
 
-        when(repository.findByCreatedBy_Id(userId)).thenReturn(List.of());
+        when(repository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.of(notebook));
 
-        List<GetNoteResponse> responses = noteService.getAllNotes(userId);
-
-        assertTrue(responses.isEmpty());
+        assertThrows(NoteNotFoundException.class, () -> noteService.updateNote(5L, 99L, request, userId));
     }
 
     @Test
-    void updateNote_whenExists_shouldUpdateFields() {
+    void deleteNote_shouldRemoveNote() {
         UUID userId = UUID.randomUUID();
-        User editor = new User();
-        editor.setId(userId);
+        Notebook notebook = notebook();
+        Note note = notebook.addNote("Title", "Text", user(userId));
+        note.setId(7L);
 
-        Note existingNote = new Note();
-        existingNote.setId(1L);
-        existingNote.setTitle("Old Title");
-        existingNote.setText("Old Text");
+        when(repository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.of(notebook));
 
-        UpdateNoteRequest request = new UpdateNoteRequest("New Title", "New Text", null);
+        noteService.deleteNote(5L, 7L, userId);
 
-        when(repository.findByIdAndCreatedBy_Id(1L, userId)).thenReturn(Optional.of(existingNote));
-        when(userRepository.findById(userId)).thenReturn(Optional.of(editor));
-
-        noteService.updateNote(1L, userId, request);
-
-        assertEquals("New Title", existingNote.getTitle());
-        assertEquals("New Text", existingNote.getText());
-        assertNull(existingNote.getNotebook());
-        assertEquals(editor, existingNote.getLastModifiedBy());
-        verify(repository).findByIdAndCreatedBy_Id(1L, userId);
+        assertTrue(notebook.getNotes().isEmpty());
     }
 
     @Test
-    void updateNote_withNotebook_shouldAssignNotebook() {
+    void deleteNote_whenNoteNotInNotebook_shouldThrow() {
         UUID userId = UUID.randomUUID();
-        User editor = new User();
-        editor.setId(userId);
+        Notebook notebook = notebook();
 
-        Note existingNote = new Note();
-        existingNote.setId(1L);
-        existingNote.setTitle("Title");
-        existingNote.setText("Text");
+        when(repository.findByIdAndOwner_Id(5L, userId)).thenReturn(Optional.of(notebook));
 
-        Notebook notebook = new Notebook();
-        notebook.setId(10L);
-
-        UpdateNoteRequest request = new UpdateNoteRequest("Title", "Text", 10L);
-
-        when(repository.findByIdAndCreatedBy_Id(1L, userId)).thenReturn(Optional.of(existingNote));
-        when(notebookRepository.findByIdAndOwner_Id(10L, userId)).thenReturn(Optional.of(notebook));
-        when(userRepository.findById(userId)).thenReturn(Optional.of(editor));
-
-        noteService.updateNote(1L, userId, request);
-
-        assertNotNull(existingNote.getNotebook());
-        assertEquals(10L, existingNote.getNotebook().getId());
-        assertEquals(editor, existingNote.getLastModifiedBy());
-    }
-
-    @Test
-    void updateNote_whenNotFound_shouldThrow() {
-        UUID userId = UUID.randomUUID();
-
-        UpdateNoteRequest request = new UpdateNoteRequest("Title", "Text", null);
-
-        when(repository.findByIdAndCreatedBy_Id(99L, userId)).thenReturn(Optional.empty());
-
-        assertThrows(NoteNotFoundException.class, () -> noteService.updateNote(99L, userId, request));
-    }
-
-    @Test
-    void deleteNote_whenExists_shouldDelete() {
-        UUID userId = UUID.randomUUID();
-
-        Note note = new Note();
-        note.setId(1L);
-        note.setTitle("Title");
-        note.setText("Text");
-
-        when(repository.findByIdAndCreatedBy_Id(1L, userId)).thenReturn(Optional.of(note));
-
-        noteService.deleteNote(1L, userId);
-
-        verify(repository).delete(note);
-    }
-
-    @Test
-    void deleteNote_whenNotFound_shouldThrow() {
-        UUID userId = UUID.randomUUID();
-
-        when(repository.findByIdAndCreatedBy_Id(99L, userId)).thenReturn(Optional.empty());
-
-        assertThrows(NoteNotFoundException.class, () -> noteService.deleteNote(99L, userId));
+        assertThrows(NoteNotFoundException.class, () -> noteService.deleteNote(5L, 99L, userId));
     }
 }

@@ -1,7 +1,7 @@
 package com.tcyao.nid.note.controller;
 
 import com.tcyao.nid.note.dto.NotePresencePayload;
-import com.tcyao.nid.note.service.NoteService;
+import com.tcyao.nid.note.service.NotebookService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Controller;
 @Controller
 @RequiredArgsConstructor
 public class NoteWSController {
-    private final NoteService noteService;
+    private final NotebookService notebookService;
 
     @MessageMapping("/note/{id}/join")
     public void joinNotePresence(@DestinationVariable long id) {

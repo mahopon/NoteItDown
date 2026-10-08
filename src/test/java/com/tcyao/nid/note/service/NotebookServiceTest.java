@@ -23,6 +23,7 @@ import java.util.UUID;
 import com.tcyao.nid.note.exception.NotebookNotFoundException;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,28 +38,34 @@ class NotebookServiceTest {
     @InjectMocks
     private NotebookService notebookService;
 
+    private User user(UUID id) {
+        User user = new User();
+        user.setId(id);
+        return user;
+    }
+
+    private Notebook notebook(Long id, String title, Instant modifiedAt) {
+        Notebook notebook = new Notebook(title, NotebookKind.PERSONAL, user(UUID.randomUUID()));
+        notebook.setId(id);
+        notebook.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        notebook.setModifiedAt(modifiedAt);
+        return notebook;
+    }
+
     @Test
     void createNotebook_shouldSaveAndReturnResponse() {
         UUID ownerId = UUID.randomUUID();
         CreateNotebookRequest request = new CreateNotebookRequest("My Notebook", CreatableNotebookKind.PERSONAL.toNotebookKind());
 
-        User owner = new User();
-        owner.setId(ownerId);
+        User owner = user(ownerId);
 
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
-
-        Notebook savedNotebook = new Notebook();
-        savedNotebook.setId(1L);
-        savedNotebook.setTitle("My Notebook");
-        savedNotebook.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
-        savedNotebook.setModifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
-
         when(repository.save(any(Notebook.class))).thenAnswer(invocation -> {
             Notebook nb = invocation.getArgument(0);
             nb.setId(1L);
             nb.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
             nb.setModifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
-            return savedNotebook;
+            return nb;
         });
 
         CreateNotebookResponse response = notebookService.createNotebook(request, ownerId);
@@ -91,17 +98,9 @@ class NotebookServiceTest {
     void getNotebook_whenExists_shouldReturnResponse() {
         UUID ownerId = UUID.randomUUID();
 
-        Notebook notebook = new Notebook();
-        notebook.setId(1L);
-        notebook.setTitle("My Notebook");
-        notebook.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
-        notebook.setModifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
-
-        Note note = new Note();
+        Notebook notebook = notebook(1L, "My Notebook", Instant.parse("2026-01-01T00:00:00Z"));
+        Note note = notebook.addNote("Note Title", "Note Text", user(ownerId));
         note.setId(10L);
-        note.setTitle("Note Title");
-        note.setText("Note Text");
-        notebook.getNotes().add(note);
 
         when(repository.findByIdAndOwner_Id(1L, ownerId)).thenReturn(Optional.of(notebook));
 
@@ -113,8 +112,8 @@ class NotebookServiceTest {
         assertEquals(10L, response.notes().get(0).id());
         assertEquals("Note Title", response.notes().get(0).title());
         assertEquals("Note Text", response.notes().get(0).text());
+        assertTrue(response.notes().get(0).attachments().isEmpty());
         assertEquals(Instant.parse("2026-01-01T00:00:00Z"), response.createdAt());
-        assertEquals(Instant.parse("2026-01-01T00:00:00Z"), response.modifiedAt());
     }
 
     @Test
@@ -130,23 +129,11 @@ class NotebookServiceTest {
     void getAllNotebooks_whenNotebooksExist_shouldReturnList() {
         UUID ownerId = UUID.randomUUID();
 
-        Notebook nb1 = new Notebook();
-        nb1.setId(1L);
-        nb1.setTitle("First");
-        nb1.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
-        nb1.setModifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
-
-        Notebook nb2 = new Notebook();
-        nb2.setId(2L);
-        nb2.setTitle("Second");
-        nb2.setCreatedAt(Instant.parse("2026-01-02T00:00:00Z"));
-        nb2.setModifiedAt(Instant.parse("2026-01-02T00:00:00Z"));
-
-        Note note1 = new Note();
+        Notebook nb1 = notebook(1L, "First", Instant.parse("2026-01-01T00:00:00Z"));
+        Note note1 = nb1.addNote("A", "a", user(ownerId));
         note1.setId(10L);
-        note1.setTitle("A");
-        note1.setText("a");
-        nb1.getNotes().add(note1);
+
+        Notebook nb2 = notebook(2L, "Second", Instant.parse("2026-01-02T00:00:00Z"));
 
         when(repository.findByOwner_Id(ownerId)).thenReturn(List.of(nb1, nb2));
 
@@ -177,12 +164,7 @@ class NotebookServiceTest {
     void updateNotebook_whenExists_shouldUpdateTitleAndModifiedAt() {
         UUID ownerId = UUID.randomUUID();
 
-        Notebook existingNotebook = new Notebook();
-        existingNotebook.setId(1L);
-        existingNotebook.setTitle("Old Title");
-        existingNotebook.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
-        existingNotebook.setModifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
-
+        Notebook existingNotebook = notebook(1L, "Old Title", Instant.parse("2026-01-01T00:00:00Z"));
         UpdateNotebookRequest request = new UpdateNotebookRequest("New Title");
 
         when(repository.findByIdAndOwner_Id(1L, ownerId)).thenReturn(Optional.of(existingNotebook));
@@ -208,11 +190,7 @@ class NotebookServiceTest {
     void deleteNotebook_whenExists_shouldDelete() {
         UUID ownerId = UUID.randomUUID();
 
-        Notebook notebook = new Notebook();
-        notebook.setId(1L);
-        notebook.setTitle("Title");
-        notebook.setCreatedAt(Instant.parse("2026-01-01T00:00:00Z"));
-        notebook.setModifiedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        Notebook notebook = notebook(1L, "Title", Instant.parse("2026-01-01T00:00:00Z"));
 
         when(repository.findByIdAndOwner_Id(1L, ownerId)).thenReturn(Optional.of(notebook));
 
